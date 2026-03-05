@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soccer Stars</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&amp;family=Quicksand:wght@500;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    .font-game { font-family: 'Bangers', cursive; }
+    .font-ui { font-family: 'Quicksand', sans-serif; }
+    
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes countdown { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes goal-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes confetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100px) rotate(720deg); opacity: 0; } }
+    
+    .animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
+    .animate-bounce-slow { animation: bounce 1s ease-in-out infinite; }
+    .animate-countdown { animation: countdown 0.5s ease-out; }
+    .animate-goal { animation: goal-flash 0.3s ease-in-out 3; }
+    
+    .btn-game {
+      background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+      border: 3px solid #166534;
+      box-shadow: 0 4px 0 #166534, 0 6px 10px rgba(0,0,0,0.3);
+      transition: all 0.1s;
+    }
+    .btn-game:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #166534, 0 8px 12px rgba(0,0,0,0.3); }
+    .btn-game:active { transform: translateY(2px); box-shadow: 0 2px 0 #166534, 0 3px 6px rgba(0,0,0,0.3); }
+    
+    .btn-shop {
+      background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+      border: 3px solid #b45309;
+      box-shadow: 0 4px 0 #b45309;
+    }
+    .btn-shop:hover { transform: translateY(-2px); }
+    .btn-shop:active { transform: translateY(2px); box-shadow: 0 2px 0 #b45309; }
+    
+    .field-bg {
+      background: linear-gradient(90deg, #22c55e 0%, #16a34a 25%, #22c55e 50%, #16a34a 75%, #22c55e 100%);
+      background-size: 200px 100%;
+    }
+    
+    .shop-item {
+      transition: all 0.2s;
+    }
+    .shop-item:hover { transform: scale(1.05); }
+    .shop-item.selected { box-shadow: 0 0 0 4px #fbbf24; }
+    .shop-item.owned { border-color: #22c55e; }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full font-ui">
+  <div id="app" class="h-full w-full overflow-auto"></div>
+  <script>
+    // Game State
+    const defaultConfig = {
+      game_title: 'Soccer Stars'
+    };
+    
+    let config = { ...defaultConfig };
+    let gameData = {
+      cash: 0,
+      highest_level: 1,
+      owned_balls: 'classic',
+      owned_nets: 'classic',
+      owned_jerseys: 'blue',
+      owned_boots: 'standard',
+      selected_ball: 'classic',
+      selected_net: 'classic',
+      selected_jersey: 'blue',
+      selected_boots: 'standard'
+    };
+    let dataRecord = null;
+    
+    // Shop Items
+    const shopBalls = [
+      { id: 'classic', name: 'Classic', price: 0, color: '#ffffff', pattern: 'pentagon' },
+      { id: 'golden', name: 'Golden', price: 100, color: '#fbbf24', pattern: 'star' },
+      { id: 'fire', name: 'Fire Ball', price: 150, color: '#ef4444', pattern: 'flame' },
+      { id: 'ice', name: 'Ice Ball', price: 150, color: '#38bdf8', pattern: 'snowflake' },
+      { id: 'galaxy', name: 'Galaxy', price: 200, color: '#8b5cf6', pattern: 'stars' },
+      { id: 'rainbow', name: 'Rainbow', price: 250, color: 'rainbow', pattern: 'rainbow' },
+      { id: 'marble', name: 'Marble', price: 300, color: '#94a3b8', pattern: 'marble' },
+      { id: 'neon', name: 'Neon', price: 350, color: '#00ff00', pattern: 'neon' }
+    ];
+    
+    const shopNets = [
+      { id: 'classic', name: 'Classic Net', price: 0, color: '#ffffff' },
+      { id: 'golden', name: 'Golden Net', price: 100, color: '#fbbf24' },
+      { id: 'neon', name: 'Neon Net', price: 150, color: '#22d3ee' },
+      { id: 'fire', name: 'Fire Net', price: 200, color: '#ef4444' },
+      { id: 'diamond', name: 'Diamond Net', price: 250, color: '#e0f2fe' },
+      { id: 'purple', name: 'Purple Net', price: 300, color: '#d946ef' },
+      { id: 'lime', name: 'Lime Net', price: 350, color: '#84cc16' }
+    ];
+    
+    const shopJerseys = [
+      { id: 'blue', name: 'Blue Jersey', price: 0, color: '#3b82f6' },
+      { id: 'red', name: 'Red Jersey', price: 80, color: '#ef4444' },
+      { id: 'green', name: 'Green Jersey', price: 80, color: '#22c55e' },
+      { id: 'purple', name: 'Purple Jersey', price: 120, color: '#8b5cf6' },
+      { id: 'gold', name: 'Gold Jersey', price: 150, color: '#fbbf24' },
+      { id: 'pink', name: 'Pink Jersey', price: 120, color: '#ec4899' },
+      { id: 'cyan', name: 'Cyan Jersey', price: 150, color: '#06b6d4' }
+    ];
+    
+    const shopBoots = [
+      { id: 'standard', name: 'Standard Boots', price: 0, boost: 1 },
+      { id: 'speed', name: 'Speed Boots (+10% speed)', price: 100, boost: 1.1 },
+      { id: 'turbo', name: 'Turbo Boots (+20% speed)', price: 200, boost: 1.2 },
+      { id: 'lightning', name: 'Lightning Boots (+30% speed)', price: 350, boost: 1.3 },
+      { id: 'sonic', name: 'Sonic Boots (+40% speed)', price: 500, boost: 1.4 }
+    ];
+    
+    // Game Constants
+    const FIELD_WIDTH = 800;
+    const FIELD_HEIGHT = 500;
+    const GOAL_WIDTH = 20;
+    const GOAL_HEIGHT = 120;
+    const PLAYER_SIZE = 40;
+    const BALL_SIZE = 20;
+    const PLAYER_SPEED = 5;
+    const BALL_FRICTION = 0.98;
+    const KICK_POWER = 12;
+    const JUMP_HEIGHT = 15;
+    const GRAVITY = 0.8;
+    
+    // Level Configs - 100 levels with progressive difficulty
+    const levelConfigs = Array.from({ length: 100 }, (_, i) => {
+      const level = i + 1;
+      const difficulty = Math.pow(level / 100, 1.3);
+      return {
+        aiSpeed: 2.5 + difficulty * 4.5,
+        aiReaction: 0.3 + difficulty * 0.65,
+        name: getLevelName(level)
+      };
+    });
+    
+    function getLevelName(level) {
+      if (level <= 10) return 'Rookie League ' + level;
+      if (level <= 25) return 'Amateur Cup ' + level;
+      if (level <= 50) return 'Semi-Pro ' + level;
+      if (level <= 75) return 'Professional ' + level;
+      if (level <= 90) return 'Champions League ' + level;
+      return 'Legend ' + level;
+    }
+    
+    // Game Variables
+    let currentScreen = 'menu';
+    let currentLevel = 1;
+    let gameLoop = null;
+    let countdownTimer = null;
+    let isPlaying = false;
+    let isPaused = false;
+    let leaderboardData = [];
+    
+    let player = { x: 150, y: FIELD_HEIGHT / 2, vx: 0, vy: 0, jumping: false, jumpVel: 0, hasBall: false };
+    let ai = { x: FIELD_WIDTH - 150, y: FIELD_HEIGHT / 2, vx: 0, vy: 0, hasBall: false };
+    let ball = { x: FIELD_WIDTH / 2, y: FIELD_HEIGHT / 2, vx: 0, vy: 0 };
+    let playerScore = 0;
+    let aiScore = 0;
+    let countdown = 3;
+    let goalScored = false;
+    let goalMessage = '';
+    let spacePressedLastFrame = false;
+    
+    let keys = { w: false, a: false, s: false, d: false, space: false };
+    
+    // Data Handler
+    const dataHandler = {
+      onDataChanged(data) {
+        if (data.length > 0) {
+          dataRecord = data[0];
+          gameData = {
+            cash: dataRecord.cash || 0,
+            highest_level: dataRecord.highest_level || 1,
+            owned_balls: dataRecord.owned_balls || 'classic',
+            owned_nets: dataRecord.owned_nets || 'classic',
+            owned_jerseys: dataRecord.owned_jerseys || 'blue',
+            owned_boots: dataRecord.owned_boots || 'standard',
+            selected_ball: dataRecord.selected_ball || 'classic',
+            selected_net: dataRecord.selected_net || 'classic',
+            selected_jersey: dataRecord.selected_jersey || 'blue',
+            selected_boots: dataRecord.selected_boots || 'standard'
+          };
+        }
+        
+        // Build leaderboard from all records
+        leaderboardData = data
+          .map((record, index) => ({
+            rank: index + 1,
+            cash: record.cash || 0,
+            level: record.highest_level || 1
+          }))
+          .sort((a, b) => b.cash - a.cash)
+          .slice(0, 10);
+        
+        renderCurrentScreen();
+      }
+    };
+    
+    async function saveGameData() {
+      const saveData = {
+        cash: gameData.cash,
+        highest_level: gameData.highest_level,
+        owned_balls: gameData.owned_balls,
+        owned_nets: gameData.owned_nets,
+        owned_jerseys: gameData.owned_jerseys,
+        owned_boots: gameData.owned_boots,
+        selected_ball: gameData.selected_ball,
+        selected_net: gameData.selected_net,
+        selected_jersey: gameData.selected_jersey,
+        selected_boots: gameData.selected_boots
+      };
+      
+      if (dataRecord) {
+        await window.dataSdk.update({ ...dataRecord, ...saveData });
+      } else {
+        await window.dataSdk.create(saveData);
+      }
+    }
+    
+    // Element SDK
+    const elementHandler = {
+      defaultConfig,
+      onConfigChange: async (newConfig) => {
+        config = { ...config, ...newConfig };
+        renderCurrentScreen();
+      },
+      mapToCapabilities: (cfg) => ({
+        recolorables: [],
+        borderables: [],
+        fontEditable: undefined,
+        fontSizeable: undefined
+      }),
+      mapToEditPanelValues: (cfg) => new Map([
+        ['game_title', cfg.game_title || defaultConfig.game_title]
+      ])
+    };
+    
+    // Initialize SDKs
+    async function init() {
+      if (window.elementSdk) {
+        window.elementSdk.init(elementHandler);
+        config = { ...defaultConfig, ...window.elementSdk.config };
+      }
+      
+      if (window.dataSdk) {
+        await window.dataSdk.init(dataHandler);
+      }
+      
+      setupControls();
+      renderCurrentScreen();
+    }
+    
+    function setupControls() {
+      document.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'w') keys.w = true;
+        if (key === 'a') keys.a = true;
+        if (key === 's') keys.s = true;
+        if (key === 'd') keys.d = true;
+        if (key === ' ') { keys.space = true; e.preventDefault(); }
+      });
+      
+      document.addEventListener('keyup', (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'w') keys.w = false;
+        if (key === 'a') keys.a = false;
+        if (key === 's') keys.s = false;
+        if (key === 'd') keys.d = false;
+        if (key === ' ') keys.space = false;
+      });
+    }
+    
+    function renderCurrentScreen() {
+      const app = document.getElementById('app');
+      
+      switch (currentScreen) {
+        case 'menu': renderMenu(app); break;
+        case 'levels': renderLevelSelect(app); break;
+        case 'shop': renderShop(app); break;
+        case 'game': renderGame(app); break;
+        case 'victory': renderVictory(app); break;
+        case 'leaderboard': renderLeaderboard(app); break;
+      }
+    }
+    
+    function renderMenu(app) {
+      app.innerHTML = `
+        <div class="h-full w-full bg-gradient-to-b from-emerald-600 to-emerald-800 flex flex-col items-center justify-center p-4">
+          <div class="text-center mb-8">
+            <h1 class="font-game text-6xl md:text-8xl text-white drop-shadow-lg animate-pulse-slow">${config.game_title}</h1>
+            <p class="text-emerald-200 text-lg mt-2">⚽ The Ultimate Soccer Challenge ⚽</p>
+          </div>
+          
+          <div class="flex flex-col gap-4 w-full max-w-xs">
+            <button onclick="goToLevels()" class="btn-game text-white font-game text-2xl py-4 px-8 rounded-xl">
+              🎮 PLAY
+            </button>
+            <button onclick="goToShop()" class="btn-shop text-white font-game text-2xl py-4 px-8 rounded-xl">
+              🛒 SHOP
+            </button>
+            <button onclick="goToLeaderboard()" class="bg-gradient-to-b from-purple-400 to-purple-600 hover:from-purple-300 border-3 border-purple-800 text-white font-game text-2xl py-4 px-8 rounded-xl shadow-lg transition-all">
+              🏆 LEADERBOARD
+            </button>
+          </div>
+          
+          <div class="mt-8 bg-black/30 rounded-xl p-4 text-white text-center">
+            <p class="text-yellow-300 font-bold text-xl">💰 Cash: $${gameData.cash}</p>
+            <p class="text-emerald-200 text-sm mt-1">🏆 Highest Level: ${gameData.highest_level}</p>
+          </div>
+          
+          <div class="mt-6 text-emerald-200 text-center text-sm">
+            <p class="font-bold mb-2">Controls:</p>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <span>W - Forward</span>
+              <span>A - Left</span>
+              <span>S - Back</span>
+              <span>D - Right</span>
+              <span class="col-span-2">SPACE - Jump/Kick</span>
+            </div>
+          </div>
+          
+          ${renderBallPreview()}
+        </div>
+      `;
+    }
+    
+    function renderBallPreview() {
+      const selectedBall = shopBalls.find(b => b.id === gameData.selected_ball);
+      return `
+        <div class="mt-4 flex items-center gap-2 text-white text-sm">
+          <span>Current Ball:</span>
+          ${renderBallSVG(selectedBall, 30)}
+          <span class="font-bold">${selectedBall.name}</span>
+        </div>
+      `;
+    }
+    
+    function renderBallSVG(ball, size) {
+      const colors = ball.color === 'rainbow' 
+        ? ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6']
+        : [ball.color];
+      
+      let pattern = '';
+      if (ball.pattern === 'pentagon') {
+        pattern = `<polygon points="${size/2},${size*0.15} ${size*0.82},${size*0.38} ${size*0.7},${size*0.85} ${size*0.3},${size*0.85} ${size*0.18},${size*0.38}" fill="#333" opacity="0.3"/>`;
+      } else if (ball.pattern === 'star') {
+        pattern = `<polygon points="${size/2},${size*0.1} ${size*0.6},${size*0.4} ${size*0.9},${size*0.4} ${size*0.65},${size*0.6} ${size*0.75},${size*0.9} ${size/2},${size*0.7} ${size*0.25},${size*0.9} ${size*0.35},${size*0.6} ${size*0.1},${size*0.4} ${size*0.4},${size*0.4}" fill="#fff" opacity="0.5"/>`;
+      } else if (ball.pattern === 'flame') {
+        pattern = `<ellipse cx="${size/2}" cy="${size*0.6}" rx="${size*0.2}" ry="${size*0.3}" fill="#fbbf24" opacity="0.8"/>`;
+      }
+      
+      const gradient = ball.color === 'rainbow' 
+        ? `<defs><linearGradient id="rainbow-${ball.id}" x1="0%" y1="0%" x2="100%" y2="100%">${colors.map((c, i) => `<stop offset="${i * 20}%" stop-color="${c}"/>`).join('')}</linearGradient></defs>`
+        : '';
+      
+      const fill = ball.color === 'rainbow' ? `url(#rainbow-${ball.id})` : ball.color;
+      
+      return `
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+          ${gradient}
+          <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="${fill}" stroke="#333" stroke-width="2"/>
+          ${pattern}
+          <ellipse cx="${size*0.35}" cy="${size*0.35}" rx="${size*0.15}" ry="${size*0.1}" fill="white" opacity="0.4"/>
+        </svg>
+      `;
+    }
+    
+    function renderLevelSelect(app) {
+      app.innerHTML = `
+        <div class="h-full w-full bg-gradient-to-b from-blue-600 to-blue-900 flex flex-col p-4 overflow-auto">
+          <div class="flex justify-between items-center mb-4">
+            <button onclick="goToMenu()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg">
+              ← Back
+            </button>
+            <p class="text-yellow-300 font-bold">💰 $${gameData.cash}</p>
+          </div>
+          
+          <h2 class="font-game text-4xl text-white text-center mb-6">Select Level</h2>
+          
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto w-full">
+            ${levelConfigs.map((level, i) => {
+              const levelNum = i + 1;
+              const unlocked = levelNum <= gameData.highest_level;
+              const completed = levelNum < gameData.highest_level;
+              
+              return `
+                <button 
+                  onclick="${unlocked ? `startLevel(${levelNum})` : ''}"
+                  class="relative bg-gradient-to-b ${unlocked ? 'from-emerald-400 to-emerald-600 hover:from-emerald-300' : 'from-gray-500 to-gray-700'} 
+                    p-4 rounded-xl shadow-lg transition-all ${unlocked ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}"
+                >
+                  <div class="text-white font-game text-2xl">${levelNum}</div>
+                  <div class="text-white/80 text-xs mt-1">${level.name}</div>
+                  ${completed ? '<div class="absolute top-2 right-2 text-yellow-300">⭐</div>' : ''}
+                  ${!unlocked ? '<div class="absolute inset-0 flex items-center justify-center"><span class="text-2xl">🔒</span></div>' : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+          
+          <div class="mt-6 text-center text-blue-200 text-sm">
+            <p>🏆 Complete all 100 levels to earn $1,000!</p>
+          </div>
+        </div>
+      `;
+    }
+    
+    function renderShop(app) {
+      const ownedBalls = gameData.owned_balls.split(',');
+      const ownedNets = gameData.owned_nets.split(',');
+      const ownedJerseys = gameData.owned_jerseys.split(',');
+      const ownedBoots = gameData.owned_boots.split(',');
+      
+      app.innerHTML = `
+        <div class="h-full w-full bg-gradient-to-b from-amber-500 to-orange-600 flex flex-col p-4 overflow-auto">
+          <div class="flex justify-between items-center mb-4">
+            <button onclick="goToMenu()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg">
+              ← Back
+            </button>
+            <p class="text-white font-bold text-xl">💰 $${gameData.cash}</p>
+          </div>
+          
+          <h2 class="font-game text-4xl text-white text-center mb-4">Shop</h2>
+          
+          <div class="mb-6">
+            <h3 class="font-game text-2xl text-white mb-3">⚽ Soccer Balls</h3>
+            <div class="grid grid-cols-3 md:grid-cols-8 gap-3">
+              ${shopBalls.map(ball => {
+                const owned = ownedBalls.includes(ball.id);
+                const selected = gameData.selected_ball === ball.id;
+                
+                return `
+                  <div class="shop-item bg-white/90 rounded-xl p-3 text-center ${selected ? 'selected' : ''} ${owned ? 'owned border-2 border-emerald-500' : 'border-2 border-transparent'}">
+                    <div class="flex justify-center mb-2">${renderBallSVG(ball, 50)}</div>
+                    <p class="font-bold text-sm text-gray-800">${ball.name}</p>
+                    ${owned 
+                      ? `<button onclick="selectBall('${ball.id}')" class="mt-2 text-xs ${selected ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-emerald-100'} px-2 py-1 rounded">
+                          ${selected ? '✓ Selected' : 'Select'}
+                        </button>`
+                      : `<button onclick="buyBall('${ball.id}')" class="mt-2 text-xs ${gameData.cash >= ball.price ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} px-2 py-1 rounded">
+                          $${ball.price}
+                        </button>`
+                    }
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="font-game text-2xl text-white mb-3">🥅 Soccer Nets</h3>
+            <div class="grid grid-cols-3 md:grid-cols-7 gap-3">
+              ${shopNets.map(net => {
+                const owned = ownedNets.includes(net.id);
+                const selected = gameData.selected_net === net.id;
+                
+                return `
+                  <div class="shop-item bg-white/90 rounded-xl p-3 text-center ${selected ? 'selected' : ''} ${owned ? 'owned border-2 border-emerald-500' : 'border-2 border-transparent'}">
+                    <div class="flex justify-center mb-2">
+                      <svg width="60" height="40" viewBox="0 0 60 40">
+                        <rect x="2" y="2" width="56" height="36" fill="none" stroke="${net.color}" stroke-width="3" rx="2"/>
+                        <line x1="2" y1="14" x2="58" y2="14" stroke="${net.color}" stroke-width="1" opacity="0.5"/>
+                        <line x1="2" y1="26" x2="58" y2="26" stroke="${net.color}" stroke-width="1" opacity="0.5"/>
+                        <line x1="20" y1="2" x2="20" y2="38" stroke="${net.color}" stroke-width="1" opacity="0.5"/>
+                        <line x1="40" y1="2" x2="40" y2="38" stroke="${net.color}" stroke-width="1" opacity="0.5"/>
+                      </svg>
+                    </div>
+                    <p class="font-bold text-sm text-gray-800">${net.name}</p>
+                    ${owned 
+                      ? `<button onclick="selectNet('${net.id}')" class="mt-2 text-xs ${selected ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-emerald-100'} px-2 py-1 rounded">
+                          ${selected ? '✓ Selected' : 'Select'}
+                        </button>`
+                      : `<button onclick="buyNet('${net.id}')" class="mt-2 text-xs ${gameData.cash >= net.price ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} px-2 py-1 rounded">
+                          $${net.price}
+                        </button>`
+                    }
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="font-game text-2xl text-white mb-3">👕 Player Jerseys</h3>
+            <div class="grid grid-cols-3 md:grid-cols-7 gap-3">
+              ${shopJerseys.map(jersey => {
+                const owned = ownedJerseys.includes(jersey.id);
+                const selected = gameData.selected_jersey === jersey.id;
+                
+                return `
+                  <div class="shop-item bg-white/90 rounded-xl p-3 text-center ${selected ? 'selected' : ''} ${owned ? 'owned border-2 border-emerald-500' : 'border-2 border-transparent'}">
+                    <div class="flex justify-center mb-2">
+                      <svg width="50" height="60" viewBox="0 0 50 60">
+                        <ellipse cx="25" cy="15" rx="8" ry="10" fill="${jersey.color}"/>
+                        <path d="M 20 22 Q 15 25 10 30 L 10 50 Q 25 55 25 55 Q 25 55 40 50 L 40 30 Q 35 25 30 22" fill="${jersey.color}"/>
+                        <circle cx="18" cy="35" r="3" fill="white"/>
+                        <circle cx="32" cy="35" r="3" fill="white"/>
+                      </svg>
+                    </div>
+                    <p class="font-bold text-sm text-gray-800">${jersey.name}</p>
+                    ${owned 
+                      ? `<button onclick="selectJersey('${jersey.id}')" class="mt-2 text-xs ${selected ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-emerald-100'} px-2 py-1 rounded">
+                          ${selected ? '✓ Selected' : 'Select'}
+                        </button>`
+                      : `<button onclick="buyJersey('${jersey.id}')" class="mt-2 text-xs ${gameData.cash >= jersey.price ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} px-2 py-1 rounded">
+                          $${jersey.price}
+                        </button>`
+                    }
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          
+          <div>
+            <h3 class="font-game text-2xl text-white mb-3">⚡ Soccer Boots</h3>
+            <div class="grid grid-cols-3 md:grid-cols-5 gap-3">
+              ${shopBoots.map(boots => {
+                const owned = ownedBoots.includes(boots.id);
+                const selected = gameData.selected_boots === boots.id;
+                
+                return `
+                  <div class="shop-item bg-white/90 rounded-xl p-3 text-center ${selected ? 'selected' : ''} ${owned ? 'owned border-2 border-emerald-500' : 'border-2 border-transparent'}">
+                    <div class="flex justify-center mb-2 text-3xl">👟</div>
+                    <p class="font-bold text-sm text-gray-800">${boots.name}</p>
+                    ${owned 
+                      ? `<button onclick="selectBoots('${boots.id}')" class="mt-2 text-xs ${selected ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-emerald-100'} px-2 py-1 rounded">
+                          ${selected ? '✓ Selected' : 'Select'}
+                        </button>`
+                      : `<button onclick="buyBoots('${boots.id}')" class="mt-2 text-xs ${gameData.cash >= boots.price ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} px-2 py-1 rounded">
+                          $${boots.price}
+                        </button>`
+                    }
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    async function buyBall(ballId) {
+      const ball = shopBalls.find(b => b.id === ballId);
+      if (ball && gameData.cash >= ball.price) {
+        gameData.cash -= ball.price;
+        gameData.owned_balls += ',' + ballId;
+        gameData.selected_ball = ballId;
+        await saveGameData();
+        renderCurrentScreen();
+      }
+    }
+    
+    async function buyNet(netId) {
+      const net = shopNets.find(n => n.id === netId);
+      if (net && gameData.cash >= net.price) {
+        gameData.cash -= net.price;
+        gameData.owned_nets += ',' + netId;
+        gameData.selected_net = netId;
+        await saveGameData();
+        renderCurrentScreen();
+      }
+    }
+    
+    async function buyJersey(jerseyId) {
+      const jersey = shopJerseys.find(j => j.id === jerseyId);
+      if (jersey && gameData.cash >= jersey.price) {
+        gameData.cash -= jersey.price;
+        gameData.owned_jerseys += ',' + jerseyId;
+        gameData.selected_jersey = jerseyId;
+        await saveGameData();
+        renderCurrentScreen();
+      }
+    }
+    
+    async function buyBoots(bootsId) {
+      const boots = shopBoots.find(b => b.id === bootsId);
+      if (boots && gameData.cash >= boots.price) {
+        gameData.cash -= boots.price;
+        gameData.owned_boots += ',' + bootsId;
+        gameData.selected_boots = bootsId;
+        await saveGameData();
+        renderCurrentScreen();
+      }
+    }
+    
+    async function selectBall(ballId) {
+      gameData.selected_ball = ballId;
+      await saveGameData();
+      renderCurrentScreen();
+    }
+    
+    async function selectNet(netId) {
+      gameData.selected_net = netId;
+      await saveGameData();
+      renderCurrentScreen();
+    }
+    
+    async function selectJersey(jerseyId) {
+      gameData.selected_jersey = jerseyId;
+      await saveGameData();
+      renderCurrentScreen();
+    }
+    
+    async function selectBoots(bootsId) {
+      gameData.selected_boots = bootsId;
+      await saveGameData();
+      renderCurrentScreen();
+    }
+    
+    function renderGame(app) {
+      const levelConfig = levelConfigs[currentLevel - 1];
+      const selectedNet = shopNets.find(n => n.id === gameData.selected_net) || shopNets[0];
+      const selectedBall = shopBalls.find(b => b.id === gameData.selected_ball) || shopBalls[0];
+      
+      app.innerHTML = `
+        <div class="h-full w-full bg-gray-900 flex flex-col items-center justify-center p-2 overflow-hidden">
+          <div class="flex justify-between items-center w-full max-w-4xl mb-2 px-2">
+            <button onclick="pauseGame()" class="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded text-sm">
+              ⏸️ Pause
+            </button>
+            <div class="text-white font-game text-lg">
+              Level ${currentLevel}: ${levelConfig.name}
+            </div>
+            <div class="text-white font-bold">
+              <span class="text-emerald-400">${playerScore}</span> - <span class="text-red-400">${aiScore}</span>
+            </div>
+          </div>
+          
+          <div class="relative bg-emerald-600 rounded-lg overflow-hidden shadow-2xl border-4 border-emerald-800" style="width: ${FIELD_WIDTH}px; height: ${FIELD_HEIGHT}px; max-width: 100%;">
+            <canvas id="gameCanvas" width="${FIELD_WIDTH}" height="${FIELD_HEIGHT}" class="w-full h-full"></canvas>
+            
+            ${countdown > 0 ? `
+              <div class="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div class="font-game text-9xl text-white animate-countdown">${countdown}</div>
+              </div>
+            ` : ''}
+            
+            ${goalScored ? `
+              <div class="absolute inset-0 flex items-center justify-center bg-black/60 animate-goal">
+                <div class="text-center">
+                  <div class="font-game text-6xl text-white">${goalMessage}</div>
+                </div>
+              </div>
+            ` : ''}
+            
+            ${isPaused ? `
+              <div class="absolute inset-0 flex items-center justify-center bg-black/70">
+                <div class="bg-white/90 rounded-xl p-6 text-center">
+                  <h3 class="font-game text-3xl text-gray-800 mb-4">PAUSED</h3>
+                  <div class="flex flex-col gap-3">
+                    <button onclick="resumeGame()" class="btn-game text-white font-bold py-2 px-6 rounded-lg">Resume</button>
+                    <button onclick="goToMenu()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">Quit</button>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+          
+          <div class="mt-2 text-white/70 text-xs text-center">
+            <span class="bg-black/30 px-2 py-1 rounded mr-2">W↑ A← S↓ D→</span>
+            <span class="bg-black/30 px-2 py-1 rounded">SPACE: Jump/Kick</span>
+          </div>
+        </div>
+      `;
+      
+      if (!isPaused && countdown === 0) {
+        drawGame();
+      }
+    }
+    
+    function drawGame() {
+      const canvas = document.getElementById('gameCanvas');
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      const selectedNet = shopNets.find(n => n.id === gameData.selected_net) || shopNets[0];
+      const selectedBall = shopBalls.find(b => b.id === gameData.selected_ball) || shopBalls[0];
+      
+      // Clear canvas
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
+      
+      // Draw field stripes
+      ctx.fillStyle = '#16a34a';
+      for (let i = 0; i < 8; i += 2) {
+        ctx.fillRect(i * (FIELD_WIDTH / 8), 0, FIELD_WIDTH / 8, FIELD_HEIGHT);
+      }
+      
+      // Draw field lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 3;
+      
+      // Center line
+      ctx.beginPath();
+      ctx.moveTo(FIELD_WIDTH / 2, 0);
+      ctx.lineTo(FIELD_WIDTH / 2, FIELD_HEIGHT);
+      ctx.stroke();
+      
+      // Center circle
+      ctx.beginPath();
+      ctx.arc(FIELD_WIDTH / 2, FIELD_HEIGHT / 2, 60, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Goal areas
+      ctx.strokeRect(0, (FIELD_HEIGHT - 150) / 2, 60, 150);
+      ctx.strokeRect(FIELD_WIDTH - 60, (FIELD_HEIGHT - 150) / 2, 60, 150);
+      
+      // Draw goals
+      const goalY = (FIELD_HEIGHT - GOAL_HEIGHT) / 2;
+      
+      // Left goal (player scores here)
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(0, goalY, GOAL_WIDTH, GOAL_HEIGHT);
+      ctx.strokeStyle = selectedNet.color;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, goalY, GOAL_WIDTH, GOAL_HEIGHT);
+      
+      // Net pattern - left
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = selectedNet.color;
+      ctx.globalAlpha = 0.5;
+      for (let y = goalY; y < goalY + GOAL_HEIGHT; y += 15) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(GOAL_WIDTH, y);
+        ctx.stroke();
+      }
+      for (let x = 0; x < GOAL_WIDTH; x += 10) {
+        ctx.beginPath();
+        ctx.moveTo(x, goalY);
+        ctx.lineTo(x, goalY + GOAL_HEIGHT);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      
+      // Right goal (AI scores here)
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(FIELD_WIDTH - GOAL_WIDTH, goalY, GOAL_WIDTH, GOAL_HEIGHT);
+      ctx.strokeStyle = selectedNet.color;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(FIELD_WIDTH - GOAL_WIDTH, goalY, GOAL_WIDTH, GOAL_HEIGHT);
+      
+      // Net pattern - right
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.5;
+      for (let y = goalY; y < goalY + GOAL_HEIGHT; y += 15) {
+        ctx.beginPath();
+        ctx.moveTo(FIELD_WIDTH - GOAL_WIDTH, y);
+        ctx.lineTo(FIELD_WIDTH, y);
+        ctx.stroke();
+      }
+      for (let x = FIELD_WIDTH - GOAL_WIDTH; x < FIELD_WIDTH; x += 10) {
+        ctx.beginPath();
+        ctx.moveTo(x, goalY);
+        ctx.lineTo(x, goalY + GOAL_HEIGHT);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      
+      // Draw player
+      const playerY = player.y - (player.jumping ? player.jumpVel : 0);
+      const selectedJersey = shopJerseys.find(j => j.id === gameData.selected_jersey) || shopJerseys[0];
+      
+      // Player shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(player.x, player.y + PLAYER_SIZE/2 + 5, PLAYER_SIZE/2, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Player body
+      ctx.fillStyle = selectedJersey.color;
+      ctx.beginPath();
+      ctx.arc(player.x, playerY, PLAYER_SIZE/2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1d4ed8';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // Player face
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.arc(player.x, playerY - 5, PLAYER_SIZE/3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Player eyes
+      ctx.fillStyle = '#1f2937';
+      ctx.beginPath();
+      ctx.arc(player.x - 5, playerY - 7, 3, 0, Math.PI * 2);
+      ctx.arc(player.x + 5, playerY - 7, 3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Player number
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('1', player.x, playerY + 12);
+      
+      // Draw AI
+      // AI shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(ai.x, ai.y + PLAYER_SIZE/2 + 5, PLAYER_SIZE/2, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // AI body
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(ai.x, ai.y, PLAYER_SIZE/2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b91c1c';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // AI face
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.arc(ai.x, ai.y - 5, PLAYER_SIZE/3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // AI eyes
+      ctx.fillStyle = '#1f2937';
+      ctx.beginPath();
+      ctx.arc(ai.x - 5, ai.y - 7, 3, 0, Math.PI * 2);
+      ctx.arc(ai.x + 5, ai.y - 7, 3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // AI number
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('9', ai.x, ai.y + 12);
+      
+      // Draw ball
+      // Ball shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(ball.x, FIELD_HEIGHT - 10, BALL_SIZE/2, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Ball
+      if (selectedBall.color === 'rainbow') {
+        const gradient = ctx.createLinearGradient(ball.x - BALL_SIZE/2, ball.y - BALL_SIZE/2, ball.x + BALL_SIZE/2, ball.y + BALL_SIZE/2);
+        gradient.addColorStop(0, '#ef4444');
+        gradient.addColorStop(0.2, '#f97316');
+        gradient.addColorStop(0.4, '#eab308');
+        gradient.addColorStop(0.6, '#22c55e');
+        gradient.addColorStop(0.8, '#3b82f6');
+        gradient.addColorStop(1, '#8b5cf6');
+        ctx.fillStyle = gradient;
+      } else {
+        ctx.fillStyle = selectedBall.color;
+      }
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BALL_SIZE/2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1f2937';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Ball pattern
+      if (selectedBall.pattern === 'pentagon') {
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const angle = (i * 72 - 90) * Math.PI / 180;
+          const x = ball.x + Math.cos(angle) * BALL_SIZE/3;
+          const y = ball.y + Math.sin(angle) * BALL_SIZE/3;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // Ball highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(ball.x - 3, ball.y - 3, 4, 3, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    function startLevel(level) {
+      currentLevel = level;
+      currentScreen = 'game';
+      playerScore = 0;
+      aiScore = 0;
+      countdown = 3;
+      goalScored = false;
+      isPaused = false;
+      
+      resetPositions();
+      renderCurrentScreen();
+      startCountdown();
+    }
+    
+    function resetPositions() {
+      player = { x: 150, y: FIELD_HEIGHT / 2, vx: 0, vy: 0, jumping: false, jumpVel: 0, hasBall: false };
+      ai = { x: FIELD_WIDTH - 150, y: FIELD_HEIGHT / 2, vx: 0, vy: 0, hasBall: false };
+      ball = { x: FIELD_WIDTH / 2, y: FIELD_HEIGHT / 2, vx: 0, vy: 0 };
+    }
+    
+    function startCountdown() {
+      countdown = 3;
+      renderCurrentScreen();
+      
+      countdownTimer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+          clearInterval(countdownTimer);
+          isPlaying = true;
+          startGameLoop();
+        }
+        renderCurrentScreen();
+      }, 1000);
+    }
+    
+    function startGameLoop() {
+      if (gameLoop) cancelAnimationFrame(gameLoop);
+      
+      function loop() {
+        if (!isPlaying || isPaused) return;
+        
+        updatePlayer();
+        updateAI();
+        updateBall();
+        checkCollisions();
+        checkGoals();
+        drawGame();
+        
+        gameLoop = requestAnimationFrame(loop);
+      }
+      
+      loop();
+    }
+    
+    function updatePlayer() {
+      const bootSpeedBoost = shopBoots.find(b => b.id === gameData.selected_boots)?.boost || 1;
+      const adjustedSpeed = PLAYER_SPEED * bootSpeedBoost;
+      
+      // Movement
+      if (keys.w) player.y -= adjustedSpeed;
+      if (keys.s) player.y += adjustedSpeed;
+      if (keys.a) player.x -= adjustedSpeed;
+      if (keys.d) player.x += adjustedSpeed;
+      
+      // Jump
+      if (keys.space && !player.jumping) {
+        player.jumping = true;
+        player.jumpVel = JUMP_HEIGHT;
+      }
+      
+      if (player.jumping) {
+        player.jumpVel -= GRAVITY;
+        if (player.jumpVel <= 0) {
+          player.jumping = false;
+          player.jumpVel = 0;
+        }
+      }
+      
+      // Bounds
+      player.x = Math.max(PLAYER_SIZE/2, Math.min(FIELD_WIDTH - PLAYER_SIZE/2, player.x));
+      player.y = Math.max(PLAYER_SIZE/2, Math.min(FIELD_HEIGHT - PLAYER_SIZE/2, player.y));
+      
+      // If player has ball, ball follows player
+      if (player.hasBall) {
+        ball.x = player.x;
+        ball.y = player.y - PLAYER_SIZE/2 - BALL_SIZE/2 - 5;
+        ball.vx = 0;
+        ball.vy = 0;
+        
+        // Shoot ball on space bar
+        if (keys.space && !spacePressedLastFrame) {
+          player.hasBall = false;
+          ball.vx = 15;
+          ball.vy = -3;
+        }
+      }
+      
+      spacePressedLastFrame = keys.space;
+    }
+    
+    function updateAI() {
+      const levelConfig = levelConfigs[currentLevel - 1];
+      const aiSpeed = levelConfig.aiSpeed * (shopBoots.find(b => b.id === gameData.selected_boots)?.boost || 1);
+      const reaction = levelConfig.aiReaction;
+      
+      // Keep AI away from walls
+      const minX = PLAYER_SIZE / 2 + 20;
+      const maxX = FIELD_WIDTH - PLAYER_SIZE / 2 - 20;
+      const minY = PLAYER_SIZE / 2 + 10;
+      const maxY = FIELD_HEIGHT - PLAYER_SIZE / 2 - 10;
+      
+      // AI decision making
+      const shouldChase = Math.random() < reaction;
+      
+      if (shouldChase) {
+        // Chase ball with smooth movement
+        const dx = ball.x - ai.x;
+        const dy = ball.y - ai.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 10) {
+          ai.x += (dx / dist) * aiSpeed;
+          ai.y += (dy / dist) * aiSpeed;
+        }
+      } else {
+        // Defend goal position
+        const goalY = (FIELD_HEIGHT - GOAL_HEIGHT) / 2 + GOAL_HEIGHT / 2;
+        const targetX = FIELD_WIDTH - 120;
+        const targetY = ball.y < FIELD_HEIGHT / 2 ? goalY - 40 : goalY + 40;
+        
+        const dx = targetX - ai.x;
+        const dy = targetY - ai.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 10) {
+          ai.x += (dx / dist) * aiSpeed * 0.6;
+          ai.y += (dy / dist) * aiSpeed * 0.6;
+        }
+      }
+      
+      // Keep AI in bounds with buffer zone
+      ai.x = Math.max(minX, Math.min(maxX, ai.x));
+      ai.y = Math.max(minY, Math.min(maxY, ai.y));
+      
+      // If AI has ball, ball follows AI
+      if (ai.hasBall) {
+        ball.x = ai.x;
+        ball.y = ai.y - PLAYER_SIZE/2 - BALL_SIZE/2 - 5;
+        ball.vx = 0;
+        ball.vy = 0;
+        
+        // AI shoots periodically
+        if (Math.random() < 0.02) {
+          ai.hasBall = false;
+          ball.vx = -12;
+          ball.vy = (Math.random() - 0.5) * 4;
+        }
+      }
+    }
+    
+    function updateBall() {
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+      
+      ball.vx *= BALL_FRICTION;
+      ball.vy *= BALL_FRICTION;
+      
+      // Wall bouncing
+      if (ball.y <= BALL_SIZE/2) {
+        ball.y = BALL_SIZE/2;
+        ball.vy = -ball.vy * 0.8;
+      }
+      if (ball.y >= FIELD_HEIGHT - BALL_SIZE/2) {
+        ball.y = FIELD_HEIGHT - BALL_SIZE/2;
+        ball.vy = -ball.vy * 0.8;
+      }
+      
+      // Side walls (but not in goal area)
+      const goalY = (FIELD_HEIGHT - GOAL_HEIGHT) / 2;
+      const inGoalZone = ball.y > goalY && ball.y < goalY + GOAL_HEIGHT;
+      
+      if (!inGoalZone) {
+        if (ball.x <= BALL_SIZE/2) {
+          ball.x = BALL_SIZE/2;
+          ball.vx = -ball.vx * 0.8;
+        }
+        if (ball.x >= FIELD_WIDTH - BALL_SIZE/2) {
+          ball.x = FIELD_WIDTH - BALL_SIZE/2;
+          ball.vx = -ball.vx * 0.8;
+        }
+      }
+    }
+    
+    function checkCollisions() {
+      // Player - Ball collision
+      const playerDist = Math.sqrt(
+        Math.pow(ball.x - player.x, 2) + 
+        Math.pow(ball.y - player.y, 2)
+      );
+      
+      if (playerDist < (PLAYER_SIZE + BALL_SIZE) / 2) {
+        player.hasBall = true;
+        ai.hasBall = false;
+      }
+      
+      // AI - Ball collision
+      const aiDist = Math.sqrt(
+        Math.pow(ball.x - ai.x, 2) + 
+        Math.pow(ball.y - ai.y, 2)
+      );
+      
+      if (aiDist < (PLAYER_SIZE + BALL_SIZE) / 2) {
+        ai.hasBall = true;
+        player.hasBall = false;
+      }
+    }
+    
+    function checkGoals() {
+      const goalY = (FIELD_HEIGHT - GOAL_HEIGHT) / 2;
+      const inGoalZone = ball.y > goalY && ball.y < goalY + GOAL_HEIGHT;
+      
+      if (inGoalZone) {
+        // Player scores (ball in left goal)
+        if (ball.x <= GOAL_WIDTH) {
+          aiScore++;
+          handleGoal('AI SCORES!');
+        }
+        // AI scores (ball in right goal)
+        if (ball.x >= FIELD_WIDTH - GOAL_WIDTH) {
+          playerScore++;
+          handleGoal('GOAL!');
+        }
+      }
+    }
+    
+    function handleGoal(message) {
+      goalScored = true;
+      goalMessage = message;
+      isPlaying = false;
+      
+      renderCurrentScreen();
+      
+      setTimeout(() => {
+        goalScored = false;
+        
+        // Check win condition (first to 3)
+        if (playerScore >= 3) {
+          handleLevelComplete();
+        } else if (aiScore >= 3) {
+          handleLevelLose();
+        } else {
+          resetPositions();
+          isPlaying = true;
+          renderCurrentScreen();
+          startGameLoop();
+        }
+      }, 2000);
+    }
+    
+    async function handleLevelComplete() {
+      isPlaying = false;
+      
+      // Award cash for completing level
+      gameData.cash += 25;
+      
+      // After level 100, restart to level 1
+      if (currentLevel === 100) {
+        gameData.cash += 975; // Additional cash (total 1000 for 100 levels)
+        gameData.highest_level = 1; // Reset to level 1
+        currentScreen = 'victory';
+      } else {
+        // Unlock next level
+        if (currentLevel >= gameData.highest_level) {
+          gameData.highest_level = currentLevel + 1;
+        }
+        currentScreen = 'levels';
+      }
+      
+      await saveGameData();
+      renderCurrentScreen();
+    }
+    
+    function handleLevelLose() {
+      isPlaying = false;
+      currentScreen = 'levels';
+      renderCurrentScreen();
+    }
+    
+    function pauseGame() {
+      isPaused = true;
+      isPlaying = false;
+      renderCurrentScreen();
+    }
+    
+    function resumeGame() {
+      isPaused = false;
+      isPlaying = true;
+      renderCurrentScreen();
+      startGameLoop();
+    }
+    
+    function renderVictory(app) {
+      app.innerHTML = `
+        <div class="h-full w-full bg-gradient-to-b from-yellow-400 via-amber-500 to-orange-600 flex flex-col items-center justify-center p-4 overflow-auto">
+          <div class="text-center">
+            <div class="text-8xl mb-4">👑</div>
+            <h1 class="font-game text-5xl md:text-7xl text-white drop-shadow-lg mb-4">ULTIMATE CHAMPION!</h1>
+            <p class="text-2xl text-white/90 mb-2">You've conquered all 100 levels!</p>
+            <p class="text-4xl text-yellow-200 font-bold mb-8">+$1,000 Earned!</p>
+            
+            <div class="bg-white/20 rounded-xl p-6 mb-6">
+              <p class="text-white text-2xl">Total Cash: <span class="font-bold text-yellow-200">${gameData.cash}</span></p>
+              <p class="text-white/80 text-lg mt-2">🎖️ You are a legendary soccer star! 🎖️</p>
+            </div>
+            
+            <div class="flex flex-col gap-4">
+              <button onclick="goToShop()" class="btn-shop text-white font-game text-2xl py-4 px-8 rounded-xl">
+                🛒 Unlock New Gear
+              </button>
+              <button onclick="goToMenu()" class="btn-game text-white font-game text-2xl py-4 px-8 rounded-xl">
+                🏠 Main Menu
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    function renderLeaderboard(app) {
+      const currentPlayerCash = gameData.cash;
+      const currentPlayerRank = leaderboardData.findIndex(entry => entry.cash === currentPlayerCash) + 1 || leaderboardData.length + 1;
+      
+      app.innerHTML = `
+        <div class="h-full w-full bg-gradient-to-b from-indigo-600 to-purple-900 flex flex-col p-4 overflow-auto">
+          <div class="flex justify-between items-center mb-4">
+            <button onclick="goToMenu()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg">
+              ← Back
+            </button>
+            <h2 class="font-game text-3xl text-white">🏆 LEADERBOARD 🏆</h2>
+            <div class="w-20"></div>
+          </div>
+          
+          <div class="bg-white/10 rounded-xl p-4 mb-6 border-2 border-yellow-300">
+            <div class="text-center">
+              <p class="text-purple-200 text-sm mb-1">YOUR RANK</p>
+              <p class="text-white font-game text-3xl">#${currentPlayerRank}</p>
+              <p class="text-yellow-200 font-bold text-lg mt-1">💰 $${currentPlayerCash}</p>
+            </div>
+          </div>
+          
+          <div class="max-w-2xl mx-auto w-full">
+            ${leaderboardData.length === 0 
+              ? '<div class="text-center text-white/70 py-8">No scores yet! Start playing to climb the leaderboard.</div>'
+              : leaderboardData.map((entry, index) => {
+                  const medals = ['🥇', '🥈', '🥉'];
+                  const medal = index < 3 ? medals[index] : '  ';
+                  const isCurrentPlayer = entry.cash === currentPlayerCash;
+                  
+                  return `
+                    <div class="flex items-center gap-4 bg-${isCurrentPlayer ? 'yellow-400/20 border-2 border-yellow-300' : 'white/10'} rounded-lg p-4 mb-3 transition-all ${isCurrentPlayer ? 'scale-105 shadow-lg' : ''}">
+                      <div class="text-2xl w-8">${medal}</div>
+                      <div class="font-game text-2xl text-white w-12">
+                        #${entry.rank}
+                      </div>
+                      <div class="flex-1">
+                        <p class="text-white font-bold text-lg">Level ${entry.level}</p>
+                        <p class="text-white/60 text-sm">Max Reached</p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-yellow-300 font-bold text-2xl">$${entry.cash}</p>
+                      </div>
+                    </div>
+                  `;
+                }).join('')
+            }
+          </div>
+        </div>
+      `;
+    }
+    
+    function goToMenu() {
+      if (gameLoop) cancelAnimationFrame(gameLoop);
+      if (countdownTimer) clearInterval(countdownTimer);
+      isPlaying = false;
+      currentScreen = 'menu';
+      renderCurrentScreen();
+    }
+    
+    function goToLevels() {
+      currentScreen = 'levels';
+      renderCurrentScreen();
+    }
+    
+    function goToShop() {
+      currentScreen = 'shop';
+      renderCurrentScreen();
+    }
+    
+    function goToLeaderboard() {
+      currentScreen = 'leaderboard';
+      renderCurrentScreen();
+    }
+    
+    // Make functions global
+    window.goToMenu = goToMenu;
+    window.goToLevels = goToLevels;
+    window.goToShop = goToShop;
+    window.goToLeaderboard = goToLeaderboard;
+    window.startLevel = startLevel;
+    window.pauseGame = pauseGame;
+    window.resumeGame = resumeGame;
+    window.buyBall = buyBall;
+    window.buyNet = buyNet;
+    window.buyJersey = buyJersey;
+    window.buyBoots = buyBoots;
+    window.selectBall = selectBall;
+    window.selectNet = selectNet;
+    window.selectJersey = selectJersey;
+    window.selectBoots = selectBoots;
+    
+    // Initialize
+    init();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d74dd1613fc8465',t:'MTc3MjY2OTA2OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
